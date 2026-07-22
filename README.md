@@ -96,11 +96,13 @@ Reconstruct the precise, second-by-second journey of the user. Sort by date, fil
 
 ![Timeline Reconstruction](Icons/timeline_drilldown.png)
 
-### 7. Session Reconstruction
+### 7. Session Reconstruction (Unified Timeline grouping mode)
 **Function:** Grouping browsing activity into meaningful sessions.
-BrowserRecon automatically clusters browsing records into distinct sessions using a 30-minute inactivity gap threshold. Each session shows its dominant domain, time span, duration, event count, and unique domain count. Drill into any session to inspect the full record list with profile, visit source, referrer chain, and visit type columns — ideal for understanding the context of a browsing sequence. A **Local Only** toggle filters out synced, extension-generated, and imported visits, ensuring activity is securely attributed to the physical machine under investigation.
+BrowserRecon automatically clusters browsing records into distinct sessions using a 30-minute inactivity gap threshold. Each session shows its dominant domain, time span, duration, event count, unique domain count, and a duration z-score so outlier sessions are easy to spot.
 
-*`[Insert Screenshot: Sessions tab showing grouped browsing sessions with dominant domain, time span, duration, and event count; expanded session showing full record list with visit type and referrer columns]`*
+As of the May 2026 refresh, session reconstruction is no longer a separate page — it is the **Session** grouping mode inside the **Unified Timeline**. Switch the Group selector to "Session" and the table reorganises into collapsible session blocks, each expandable to its member events. The deprecated `/sessions` route now redirects to `/unified?group=session` so existing bookmarks keep working.
+
+*`[Insert Screenshot: Unified Timeline with Group=Session active, showing collapsible session blocks each with dominant domain, duration, event count, and z-score badge]`*
 
 ![Session Reconstruction Timeline](Icons/session_reconstruction.png)
 
@@ -114,23 +116,40 @@ Export the entire current investigation — history, cookies, bookmarks, downloa
 
 ### 9. Advanced OSI Analysis Suite
 **Function:** Local-first open-source intelligence enrichment.
-BrowserRecon includes a comprehensive suite of OSI analysis tools organized into five tabs in the Intelligence Center:
+BrowserRecon includes a comprehensive suite of OSI analysis tools organized into eight tabs in the Intelligence Center (Threat Summary, **Phishing**, Domains, DGA Entropy, Typo-Squat, Ext. Risk, Exfiltration, Credentials):
 
 *   **Threat Summary**: Aggregates composite risk scores across all OSI signals (DGA, Typo-Squat, RDAP age, domain category, extension risk) into a single ranked view. Each domain receives an overall risk level (Critical/High/Medium/Low) and a 0–100 composite score for rapid triage.
 
 *`[Insert Screenshot: Intelligence Center → Threat Summary tab showing composite risk scores, signal columns, and Critical/High risk badges]`*
 
-*   **Domains** *(merged Domain Intel + Domain Age)*: Per-domain visit aggregation showing visit count, category, RDAP registration status, domain age, and last-seen date all in one table. Supports bulk RDAP enrichment with "ENRICH CATEGORIES", "ENRICH TOP 100", "ENRICH SELECTED (N)", and "RETRY FAILED (N)" buttons. Expandable rows show first seen, browsers, unique URLs, and RDAP registration date. Status badges (Known/New/Established/Error/Pending) and a **Known-Domains Whitelist** let analysts permanently mark trusted infrastructure — removing it from risk scoring and reducing noise across all five Intelligence Center tabs.
+*   **Domains** *(merged Domain Intel + Domain Age)*: Per-domain visit aggregation showing visit count, category, RDAP registration status, domain age, and last-seen date all in one table. Supports bulk RDAP enrichment with "ENRICH CATEGORIES", "ENRICH TOP 100", "ENRICH SELECTED (N)", and "RETRY FAILED (N)" buttons. Expandable rows show first seen, browsers, unique URLs, and RDAP registration date. Status badges (Known/New/Established/Error/Pending) and a **Known-Domains Whitelist** let analysts permanently mark trusted infrastructure — removing it from risk scoring and reducing noise across all eight Intelligence Center tabs.
 
 *`[Insert Screenshot: Intelligence Center → Domains tab showing merged visit count, category badge, RDAP status/age, last seen columns, and expandable detail row]`*
 
+*   **Phishing (Brand Impersonation)**: Flags pages whose `<title>` references a well-known brand (Microsoft/Outlook, Google/Gmail, Apple/iCloud, PayPal, Okta, GitHub, DocuSign, major banks, couriers, Adobe, Zoom, Slack, Coinbase, IRS, USPS, …) while the host is **not** on that brand's legitimate-domain allowlist. Catches lookalike infrastructure like `online.projects100-docus.top` that impersonates Microsoft login screens. Flagged events cascade into the Unified Timeline and History views as a `brand_impersonation` risk chip. Backed by the `get_brand_impersonation_hits` Tauri command.
 *   **DGA Entropy Scorer**: Detects algorithmically generated domain names using Shannon entropy + n-gram bigram analysis with CDN/cloud whitelisting and tiered thresholds.
 *   **Typo-Squat Detector**: Identifies potential phishing domains using Damerau-Levenshtein distance with homoglyph normalization against 36 brand targets with TLD variants.
-*   **Extension Risk Scorer**: Scores browser extensions by declared permissions against a weighted risk rubric, and cross-references against known malicious extension databases.
+*   **Extension Risk Scorer**: Scores browser extensions by declared permissions against a weighted risk rubric, and cross-references against known malicious extension databases. The parser resolves Chrome i18n placeholders (e.g. `__MSG_extName__`) against the bundled `_locales/<default_locale>/messages.json` so extensions render with their real names (uBlock Origin, Bitwarden, …) instead of cryptic placeholders. It also unpacks Firefox `.xpi` archives, extracts manifest icons, marks Chromium "component" (built-in) extensions, and gathers extensions from Chrome / Edge / Brave / Vivaldi / Yandex / Firefox. Each row in the Extensions tab now shows the real icon, a "built-in" pill for component extensions, hoverable plain-English permission tooltips, and a one-click link to the relevant Chrome Web Store or addons.mozilla.org page.
 
 **Dynamic Threat Intel Enrichment**: The `run_threat_intel` command checks the top 10 medium-or-higher risk entries against URLhaus and PhishTank in real time, surfacing live threat hits directly in the Threat Summary tab.
 
-**Column Sorting**: Every table across the Intelligence Center (all 5 tabs), ArtifactExplorer (History, Cookies, Bookmarks, Downloads, Extensions, Searches), and Timeline supports click-to-sort on all columns via the `useSortableTable` hook.
+**Column Sorting**: Every table across the Intelligence Center (all 8 tabs), ArtifactExplorer (History, Cookies, Bookmarks, Downloads, Extensions, Searches), and Timeline supports click-to-sort on all columns via the `useSortableTable` hook.
+
+**Column Auto-Fit**: Tables using `ResizableTh` expose a **Fit** button (and double-click-to-fit on any column handle) that measures the longest rendered cell per column and snaps widths to content — powered by `src/lib/fitColumns.ts`.
+
+**Right-Side Detail Drawer**: Clicking a Unified Timeline row opens a context-preserving side drawer (`DetailDrawer`) with the full URL, referrer, risk-flag chips, and one-click copy — replacing the old modal so the underlying list stays visible during triage. The drawer also exposes an **"Open in Artifact Explorer"** footer link that pivots the analyst from the timeline event back to its underlying artifact row.
+
+**Configurable Rules Engine (May 2026)**: The Phishing, Exfiltration, and Credentials tabs are driven by a user-editable rules engine. Each tab has a gear-icon in the toolbar that opens a slide-in **RulesPanel** listing every rule with an enable/disable toggle, a 0–100 severity slider, and a JSON params editor. 13 builtin rules ship by default — including **Cyrillic / Unicode homoglyph detection**, IDN Punycode decode, brand-keyword + suspicious-TLD pairings, suspicious upload hosts, paste-site visits, large-download bursts, OAuth high-risk scopes, incognito-gap inference, and password-reuse detection. Analysts can also **author custom rules** using three flexible matcher categories:
+
+- **`regex`** — match a Rust regex against any of these fields: `host`, `url`, `title`, `referrer`, `domain`, `path`. Case-sensitive or insensitive.
+- **`contains`** — simple substring search on a chosen field.
+- **`host_in_list`** — exact (or suffix) match against a custom host list.
+
+Example rule (ships disabled by default as a regex template): a Cyrillic-block regex `[Ѐ-ӿ]` against the `host` field. The DGA Entropy, Typo-Squat, and Ext. Risk tabs instead expose a **SettingsPanel** for tuning numeric thresholds (entropy, distance, etc.) and editing the brand-target / CDN-whitelist / malicious-ID lists directly. All rules and settings persist as JSON in `%LOCALAPPDATA%\BrowserRecon\` (Windows) so customisations survive restarts and upgrades.
+
+### 10. Theme — Light / Dark / System
+**Function:** OS-aware theming.
+The theme toggle is now tri-state — **Light**, **Dark**, or **System**. In *System* mode the app subscribes to `prefers-color-scheme` and flips live when the OS theme changes. Choice persists to `localStorage` under `browserrecon_theme`.
 
 ![Analytics Dashboard](Icons/analytics.png)
 
@@ -155,7 +174,7 @@ BrowserRecon is distributed as a **Portable Forensic Package**. No installation 
 ![Triage Ready Interface](Icons/triage.png)
 
 ### 1. Ingestion
-1. Download [**BrowserRecon.zip**](BrowserRecon.zip).
+1. Download the latest dated release zip (e.g. **BrowserRecon_2026-04-21.zip**) — the archive mirrors the original `BrowserRecon.zip` manifest exactly (same 8 files, no extras).
 2. Extract the archive and locate `BrowserRecon.exe`.
 3. Use the **Auto Detect** feature to instantly find and shadow-copy history from supported browsers.
 
