@@ -1,0 +1,12 @@
+﻿# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Local sigstore working copies (signatures are uploaded next to .zip/.exe in repo)
+*.sigstore.json.tmp
